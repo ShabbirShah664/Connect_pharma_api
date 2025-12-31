@@ -1,9 +1,11 @@
 // src/services/authService.js
 
-const admin = require('../config/firebase_config');
+const { admin } = require('../config/firebase_config');
 const jwt = require('jsonwebtoken');
 
-const db = admin.firestore();
+// We use a getter or call admin.firestore() inside functions to ensure 
+// it's accessed only after initializeApp has been called.
+const getDb = () => admin.firestore();
 
 // Helper function to generate JWT
 const generateToken = (uid, role) => {
@@ -13,57 +15,85 @@ const generateToken = (uid, role) => {
 // --- Registration ---
 exports.register = async (role, userData) => {
     try {
-        const userCredential = await admin.auth().createUser({
+        // 1. Create user in Firebase Auth using Admin SDK
+        const userRecord = await admin.auth().createUser({
             email: userData.email,
             password: userData.password,
             displayName: userData.name,
         });
 
-        const uid = userCredential.uid;
-        const collectionName = role.toLowerCase() + 's'; 
+        const uid = userRecord.uid;
+        const collectionName = role.toLowerCase() + 's';
 
+        // 2. Store profile in Firestore
         const profileData = {
             uid: uid,
             name: userData.name,
             email: userData.email,
             contactNumber: userData.contactNumber,
+            licenseNumber: userData.licenseNumber || '',
+            address: userData.address || '',
             role: role,
-            // Pharmacist/Rider would have specific fields here
             createdAt: admin.firestore.FieldValue.serverTimestamp()
         };
 
-        await db.collection(collectionName).doc(uid).set(profileData);
+        await getDb().collection(collectionName).doc(uid).set(profileData);
 
+        // 3. Generate internal JWT
         const token = generateToken(uid, role);
-        return { token, uid, role, message: `${role} registered successfully` };
+        return { token, uid, role, message: role + ' registered successfully' };
 
     } catch (error) {
+        console.error('Registration Error:', error.message);
         throw new Error(error.message || 'Registration failed');
     }
 };
 
 // --- Login ---
+// Note: Firebase Admin SDK doesn't support verifying passwords directly.
+// We use the Firebase Auth REST API for this.
 exports.login = async (role, email, password) => {
     try {
-        // Mocked check: assumes client-side Firebase login is successful
-        // In production, the client passes an ID Token, which you verify here.
-        const collectionName = role.toLowerCase() + 's';
-        const snapshot = await db.collection(collectionName).where('email', '==', email).limit(1).get();
-
-        if (snapshot.empty) {
-            throw new Error(`No ${role} found with this email.`);
+        const apiKey = process.env.FIREBASE_API_KEY;
+        if (!apiKey) {
+            throw new Error('Server Configuration Error: Missing FIREBASE_API_KEY in .env. Please add it to enable login.');
         }
 
-        const userDoc = snapshot.docs[0];
-        const uid = userDoc.id;
+        // Use built-in fetch if available (Node 18+) or a library. 
+        // For maximum compatibility in unknown Node environments, we can try native HTTPS or check for fetch.
+        // Assuming modern Node, using fetch:
+        const url = 'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=' + apiKey;
 
-        // Note: Password validation requires Firebase Client SDK. Here, we rely on the
-        // client-side login result (or ID Token) for security.
-        
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email,
+                password,
+                returnSecureToken: true
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error?.message || 'Invalid credentials');
+        }
+
+        const uid = data.localId;
+        const collectionName = role.toLowerCase() + 's';
+
+        // Verify user exists in Firestore and has correct role
+        const userDoc = await getDb().collection(collectionName).doc(uid).get();
+        if (!userDoc.exists) {
+            throw new Error('Unauthorized: No ' + role + ' profile found for this user.');
+        }
+
         const token = generateToken(uid, role);
-        return { token, uid, role, message: `${role} logged in successfully` };
-        
+        return { token, uid, role, user: userDoc.data(), message: role + ' logged in successfully' };
+
     } catch (error) {
-        throw new Error(error.message || 'Login failed. Invalid credentials or role mismatch.');
+        console.error('Login Error:', error.message);
+        throw new Error(error.message || 'Login failed');
     }
 };

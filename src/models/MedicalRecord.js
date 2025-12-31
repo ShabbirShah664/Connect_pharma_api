@@ -1,12 +1,11 @@
-// connect-pharma-api/models/MedicalRecord.js
 const admin = require('firebase-admin');
-const db = admin.firestore();
+const getDb = () => admin.firestore();
 const RECORDS_COLLECTION = 'medical_records';
 
 const MedicalRecord = {
     create: async (recordData) => {
         try {
-            const recordRef = db.collection(RECORDS_COLLECTION).doc();
+            const recordRef = getDb().collection(RECORDS_COLLECTION).doc();
             await recordRef.set({
                 ...recordData,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -21,7 +20,7 @@ const MedicalRecord = {
 
     findByUserId: async (userId) => {
         try {
-            const snapshot = await db.collection(RECORDS_COLLECTION)
+            const snapshot = await getDb().collection(RECORDS_COLLECTION)
                 .where('userId', '==', userId)
                 .orderBy('createdAt', 'desc')
                 .get();

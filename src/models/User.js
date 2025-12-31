@@ -1,12 +1,11 @@
-// connect-pharma-api/models/User.js
 const admin = require('firebase-admin');
-const db = admin.firestore();
+const getDb = () => admin.firestore();
 const USERS_COLLECTION = 'users';
 
 const User = {
     findById: async (userId) => {
         try {
-            const doc = await db.collection(USERS_COLLECTION).doc(userId).get();
+            const doc = await getDb().collection(USERS_COLLECTION).doc(userId).get();
             if (!doc.exists) return null;
             return { id: doc.id, ...doc.data() };
         } catch (error) {
@@ -17,11 +16,11 @@ const User = {
 
     findByEmail: async (email) => {
         try {
-            const snapshot = await db.collection(USERS_COLLECTION)
+            const snapshot = await getDb().collection(USERS_COLLECTION)
                 .where('email', '==', email)
                 .limit(1)
                 .get();
-            
+
             if (snapshot.empty) return null;
 
             const doc = snapshot.docs[0];
@@ -34,7 +33,7 @@ const User = {
 
     create: async (userData) => {
         try {
-            const userRef = db.collection(USERS_COLLECTION).doc(); 
+            const userRef = getDb().collection(USERS_COLLECTION).doc();
             await userRef.set({
                 ...userData,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),

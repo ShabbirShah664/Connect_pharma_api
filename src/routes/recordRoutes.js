@@ -9,9 +9,9 @@ router.post('/', protect, restrictTo('user'), async (req, res) => {
     const { title, storageUrl, recordType } = req.body;
     try {
         const newRecord = await MedicalRecord.create({
-            userId: req.user.id,
+            userId: req.user.uid,
             title,
-            storageUrl, 
+            storageUrl,
             recordType,
         });
         res.status(201).json(newRecord);
@@ -23,7 +23,7 @@ router.post('/', protect, restrictTo('user'), async (req, res) => {
 // @route   GET /api/records
 router.get('/', protect, restrictTo('user'), async (req, res) => {
     try {
-        const records = await MedicalRecord.findByUserId(req.user.id);
+        const records = await MedicalRecord.findByUserId(req.user.uid);
         res.json(records);
     } catch (error) {
         res.status(500).json({ message: 'Failed to fetch records.' });

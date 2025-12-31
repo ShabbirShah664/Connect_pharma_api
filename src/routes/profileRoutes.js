@@ -7,14 +7,14 @@ const User = require('../models/User');
 // @route   GET /api/profile
 router.get('/', protect, async (req, res) => {
     try {
-        const user = await User.findById(req.user.id);
-        
+        const user = await User.findById(req.user.uid);
+
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
-        
+
         delete user.passwordHash;
-        
+
         res.json({ user });
     } catch (error) {
         console.error(error);

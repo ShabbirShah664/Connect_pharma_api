@@ -1,15 +1,14 @@
-// connect-pharma-api/models/Request.js
 const admin = require('firebase-admin');
-const db = admin.firestore();
+const getDb = () => admin.firestore();
 const REQUESTS_COLLECTION = 'requests';
 
 const Request = {
     create: async (requestData) => {
         try {
-            const requestRef = db.collection(REQUESTS_COLLECTION).doc();
+            const requestRef = getDb().collection(REQUESTS_COLLECTION).doc();
             await requestRef.set({
                 ...requestData,
-                status: 'pending', 
+                status: 'pending',
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
@@ -23,7 +22,7 @@ const Request = {
 
     findByUserId: async (userId) => {
         try {
-            const snapshot = await db.collection(REQUESTS_COLLECTION)
+            const snapshot = await getDb().collection(REQUESTS_COLLECTION)
                 .where('userId', '==', userId)
                 .orderBy('createdAt', 'desc')
                 .get();
@@ -34,11 +33,11 @@ const Request = {
             throw new Error('Database error');
         }
     },
-    
+
     findNearbyPending: async (coords) => {
         // NOTE: Geo-query logic is complex. This is a placeholder returning all pending.
         try {
-            const snapshot = await db.collection(REQUESTS_COLLECTION)
+            const snapshot = await getDb().collection(REQUESTS_COLLECTION)
                 .where('status', '==', 'pending')
                 .orderBy('createdAt', 'asc')
                 .limit(20)
@@ -53,7 +52,7 @@ const Request = {
 
     update: async (requestId, updateData) => {
         try {
-            const requestRef = db.collection(REQUESTS_COLLECTION).doc(requestId);
+            const requestRef = getDb().collection(REQUESTS_COLLECTION).doc(requestId);
             await requestRef.update({
                 ...updateData,
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),

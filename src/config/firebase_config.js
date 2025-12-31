@@ -1,27 +1,37 @@
-// connect-pharma-api/config/firebaseConfig.js
-
 const admin = require('firebase-admin');
-const path = require('path');
 
 const connectDB = () => {
     try {
         if (admin.apps.length === 0) {
-            const serviceAccountPath = path.resolve(process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
-            const serviceAccount = require(serviceAccountPath);
-
-            admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount)
-            });
-            console.log('✅ Firebase Admin SDK Initialized and Connected to Firestore.');
+            // Priority 1: Service Account JSON File
+            if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
+                const serviceAccount = require(require('path').resolve(process.env.FIREBASE_SERVICE_ACCOUNT_PATH));
+                admin.initializeApp({
+                    credential: admin.credential.cert(serviceAccount)
+                });
+                console.log('✅ Firebase Admin SDK Initialized using Service Account File.');
+            }
+            // Priority 2: Individual Environment Variables
+            else if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
+                admin.initializeApp({
+                    credential: admin.credential.cert({
+                        projectId: process.env.FIREBASE_PROJECT_ID,
+                        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+                        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+                    })
+                });
+                console.log('✅ Firebase Admin SDK Initialized using Environment Variables.');
+            } else {
+                throw new Error('Missing Firebase configuration environment variables.');
+            }
         }
 
-        // Return the Firestore instance
-        return admin.firestore(); 
+        return admin.firestore();
 
     } catch (error) {
-        console.error('❌ Firebase initialization error:', error.message);
+        console.error('❌ Firebase Error:', error.message);
         return null;
     }
 };
 
-module.exports = connectDB;
+module.exports = { connectDB, admin };
